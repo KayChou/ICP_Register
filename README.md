@@ -11,7 +11,7 @@ Transforms are solved using SVD decomposition and searching is performed using k
 ```
 class Point
 {
-	float pos[3];	// x,y,z coordinates of a point in space.
+    float pos[3];    // x,y,z coordinates of a point in space.
 }
 
 ICP.h:
