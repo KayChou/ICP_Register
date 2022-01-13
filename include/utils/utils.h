@@ -7,7 +7,7 @@
 
 using namespace gs;
 
-void load_ply(char *filename, std::vector<Point*>& points);
+void load_ply(char *filename, float* points, int &cnt);
 
 void applyAffineTransform(std::vector<Point*>& points, float* R, float* T);
 

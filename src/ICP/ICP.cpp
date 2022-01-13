@@ -30,7 +30,7 @@ void gs::icp(std::vector<Point*> &dynamicPointCloud, std::vector<Point*> &static
     // initialize the rotation matrix
     clearRotation(rotationMatrix);
 
-    const int maxIterations = 400;
+    const int maxIterations = 100;
     const int numRandomSamples = 400;
     const float eps = 1e-8;
     gs::Point p;

@@ -16,6 +16,7 @@
  *             dicook@iastate.edu                           *
  *                                                          *
  ************************************************************/
+#pragma once
 
 #define PRECISION1 32768
 #define PRECISION2 16384
@@ -32,6 +33,18 @@
 #define PROJ_DIM 5
 #define True 1
 #define False 0
+
+typedef struct int3
+{
+    int x, y, z;
+} int3;
+
+
+typedef struct VertsRGB
+{
+    float x, y, z;
+    float r, g, b;
+} VertsRGB;
 
 typedef struct KRT {
     float fx;

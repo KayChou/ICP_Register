@@ -1,7 +1,7 @@
 #include "utils.h"
 
 
-void load_ply(char *filename, std::vector<Point*>& points)
+void load_ply(char *filename, float* points, int &cnt)
 {
     FILE *f = fopen(filename, "r");
     if(f == NULL) {
@@ -13,7 +13,6 @@ void load_ply(char *filename, std::vector<Point*>& points)
     }
     char str[100];
     float tmp;
-    int cnt = 0;
 
     // read header
     fscanf(f, "%s", str);
@@ -28,8 +27,10 @@ void load_ply(char *filename, std::vector<Point*>& points)
     float x, y, z;
 
     for(int i = 0; i < cnt; i++) {
-        fscanf(f, "%f %f %f", &x, &y, &z);
-        points.push_back(new Point(x, y, z));
+        fscanf(f, "%f %f %f", &points[3 * i], &points[3 * i + 1], &points[3 * i + 2]);
+        points[3 * i] /= 1000;
+        points[3 * i + 1] /= 1000;
+        points[3 * i + 2] /= 1000;
         // printf("%f %f %f\n", x, y, z);
     }
 
