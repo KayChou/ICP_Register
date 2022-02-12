@@ -30,6 +30,9 @@ public:
     KRT krt[CAM_NUM];
     int vert_cnt[CAM_NUM];
 
+    float **R_icp;
+    float **T_icp;
+
 private:
     GLFWwindow* window;
     glm::vec3 cameraPos;
@@ -55,7 +58,9 @@ public:
     void loop();
     void destroy();
 
+    void do_ICP(int cam_idx);
     void update_data();
+    void update_KRT();
 
     void processInput();
     void glInit();

@@ -1,122 +1,167 @@
 #include "ICP.h"
 
-void gs::icp(std::vector<Point*> &dynamicPointCloud, std::vector<Point*> &staticPointCloud)
+#include "icp.h"
+#include "opencv/cv.h"
+#include <iostream>
+
+void FindClosestPointForEach(PointCloud &sourceCloud, cv::Mat &destPoints, vector<float> &distances, vector<size_t> &indices)
 {
-    float rotationMatrix[9];
-    float translation[3];
+	int nVerts2 = destPoints.rows;
+	typedef nanoflann::KDTreeSingleIndexAdaptor<nanoflann::L2_Simple_Adaptor<float, PointCloud>, PointCloud, 3> kdTree;
+	kdTree tree(3, sourceCloud);
+	tree.buildIndex();
 
-    std::vector<Point*> staticPointCloudCopy;
-    
-    gs::Point dynamicMid(0.0,0.0,0.0);
-    gs::Point staticMid(0.0,0.0,0.0);
+#pragma omp parallel for
+	for (int i = 0; i < nVerts2; i++)
+	{
+		nanoflann::KNNResultSet<float> resultSet(1);
+		resultSet.init(&indices[i], &distances[i]);
+		tree.findNeighbors(resultSet, (float*)destPoints.row(i).data, nanoflann::SearchParams());
+	}
+}
 
-    // copy the static point cloud
-    for (int i = 0; i < staticPointCloud.size(); i++)
-    {
-        Point* pCopy = new Point(staticPointCloud[i]->pos[0], staticPointCloud[i]->pos[1], staticPointCloud[i]->pos[2]);
-        staticPointCloudCopy.push_back(pCopy);
-    }
+float GetStandardDeviation(vector<float> &data)
+{
+	float mean = 0;
+	for (size_t i = 0; i < data.size(); i++)
+	{
+		mean += data[i];
+	}
+	mean /= data.size();
 
-    // create the kd tree
-    KdTree* tree = new KdTree(staticPointCloudCopy);
-    size_t numDynamicPoints = dynamicPointCloud.size();
+	float std = 0;
 
-    computeCloudMean(staticPointCloud, &staticMid);
-    computeCloudMean(dynamicPointCloud, &dynamicMid);
+	for (size_t i = 0; i < data.size(); i++)
+	{
+		std += pow(data[i] - mean, 2);
+	}
 
-    // initialize the translation vector
-    clearTranslation(translation);
+	std /= data.size();
+	std = sqrt(std);
 
-    // initialize the rotation matrix
-    clearRotation(rotationMatrix);
+	return std;
+}
 
-    const int maxIterations = 100;
-    const int numRandomSamples = 400;
-    const float eps = 1e-8;
-    gs::Point p;
-    gs::Point x;
+void RejectOutlierMatches(vector<Point3f> &matches1, vector<Point3f> &matches2, vector<float> &matchDistances, float maxStdDev)
+{
+	float distanceStandardDev = GetStandardDeviation(matchDistances);
 
-    float cost = 1.0;
-    std::srand(std::time(0));
+	vector<Point3f> filteredMatches1;
+	vector<Point3f> filteredMatches2;
+	for (size_t i = 0; i < matches1.size(); i++)
+	{
+		if (matchDistances[i] > maxStdDev * distanceStandardDev)
+			continue;
 
-    gs::Point qd;
-    gs::Point qs;
+		filteredMatches1.push_back(matches1[i]);
+		filteredMatches2.push_back(matches2[i]);
+	}
 
-    float U[9];
-    float w[9];
-    float sigma[3];
-    float V[9];
+	matches1 = filteredMatches1;
+	matches2 = filteredMatches2;
+}
 
-    float** uSvd = new float*[3];
-    float** vSvd = new float*[3];
-    uSvd[0] = new float[3];
-    uSvd[1] = new float[3];
-    uSvd[2] = new float[3];
+float icp(Point3f *verts1, Point3f *verts2, int nVerts1, int nVerts2, float *R, float *t, int maxIter)
+{
+	PointCloud cloud1;
+	cloud1.pts = vector<Point3f>(verts1, verts1 + nVerts1);
 
-    vSvd[0] = new float[3];
-    vSvd[1] = new float[3];
-    vSvd[2] = new float[3];
+	cv::Mat matR(3, 3, CV_32F, R);
+	cv::Mat matT(1, 3, CV_32F, t);
 
-    for (int iter = 0; iter < maxIterations && abs(cost) > eps; iter++)
-    {
-        cost = 0.0;
-        
-        //clearRotation(rotationMatrix);
-        clearMatrix(U);
-        clearMatrix(V);
-        clearMatrix(w);
-        computeCloudMean(dynamicPointCloud, &dynamicMid);
+	cv::Mat verts2Mat(nVerts2, 3, CV_32F, (float*)verts2);
 
-        for (int i = 0; i < numRandomSamples; i++)
-        {
-            int randSample = std::rand() % dynamicPointCloud.size();
-            // sample the dynamic point cloud
-            p = *dynamicPointCloud[randSample];
+	float error = 1;
 
-            // get the closest point in the static point cloud
-            tree->search(&p, &x);
+	for (int iter = 0; iter < maxIter; iter++)
+	{
+		vector<Point3f> matched1, matched2;
 
-            qd = p - dynamicMid;
-            qs = x - staticMid;
+		vector<float> distances(nVerts2);
+		vector<size_t> indices(nVerts2);
+		FindClosestPointForEach(cloud1, verts2Mat, distances, indices);
 
-            outerProduct(&qs, &qd, w);
-            addMatrix(w, U, U);
+		vector<float> matchDistances;
+		vector<int> matchIdxs(nVerts1, -1);
+		for (int i = 0; i < nVerts2; i++)
+		{
+			int pos = matchIdxs[indices[i]];
 
-            cost += error(&x, &p, rotationMatrix, translation);
-        }
+			if (pos != -1)
+			{
+				if (matchDistances[pos] < distances[i])
+					continue;
+			}
 
-        copyMatToUV(U, uSvd);
-        dsvd(uSvd, 3, 3, sigma, vSvd);
-        copyUVtoMat(uSvd, U);
-        copyUVtoMat(vSvd, V);
+			Point3f temp;
+			temp.X = verts2Mat.at<float>(i, 0);
+			temp.Y = verts2Mat.at<float>(i, 1);
+			temp.Z = verts2Mat.at<float>(i, 2);
 
-        transpose(V);
-        matrixMult(U, V, rotationMatrix);
+			if (pos == -1)
+			{
+				matched1.push_back(verts1[indices[i]]);
+				matched2.push_back(temp);
 
-        gs::Point t(0.0, 0.0, 0.0);
-        rotate(&dynamicMid, rotationMatrix, &t);
-        translation[0] = staticMid.pos[0] - t.pos[0];
-        translation[1] = staticMid.pos[1] - t.pos[1];
-        translation[2] = staticMid.pos[2] - t.pos[2];
+				matchDistances.push_back(distances[i]);
 
-        //update the point cloud
-        for (int i = 0; i < dynamicPointCloud.size(); i++)
-        {
-            rotate(dynamicPointCloud[i], rotationMatrix, &p);
-            translate(&p, translation, dynamicPointCloud[i]);
-        }
-    }
+				matchIdxs[indices[i]] = matched1.size() - 1;
+			}
+			else
+			{
+				matched2[pos] = temp;
+				matchDistances[pos] = distances[i];
+			}
+		}
 
-    staticPointCloudCopy.clear();
-    delete tree;
-    
-    delete[] uSvd[0];
-    delete[] uSvd[1];
-    delete[] uSvd[2];
-    delete[] uSvd;
+		RejectOutlierMatches(matched1, matched2, matchDistances, 12.5);
 
-    delete[] vSvd[0];
-    delete[] vSvd[1];
-    delete[] vSvd[2];
-    delete[] vSvd;
+		//error = 0;
+		//for (int i = 0; i < matchDistances.size(); i++)
+		//{
+		//	error += sqrt(matchDistances[i]);
+		//}
+		//error /= matchDistances.size();
+		//cout << error << endl;
+
+		cv::Mat matched1MatCv(matched1.size(), 3, CV_32F, matched1.data());
+		cv::Mat matched2MatCv(matched2.size(), 3, CV_32F, matched2.data());
+		cv::Mat tempT;
+		cv::reduce(matched1MatCv - matched2MatCv, tempT, 0, CV_REDUCE_AVG);
+
+		for (int i = 0; i < verts2Mat.rows; i++)
+		{
+			verts2Mat.row(i) += tempT;
+		}
+		for (int i = 0; i < matched2MatCv.rows; i++)
+		{
+			matched2MatCv.row(i) += tempT;
+		}
+
+		cv::Mat M = matched2MatCv.t() * matched1MatCv;
+		cv::SVD svd;
+		svd(M);
+		cv::Mat tempR = svd.u * svd.vt;
+
+		double det = cv::determinant(tempR);
+		if (det < 0)
+		{
+			cv::Mat temp = cv::Mat::eye(3, 3, CV_32F);
+			temp.at<float>(2, 2) = -1;
+			tempR = svd.u * temp * svd.vt;
+		}
+
+		verts2Mat = verts2Mat * tempR;
+
+		matT += tempT * matR.t();
+		matR = matR * tempR;
+	}
+
+	// memcpy(verts2, verts2Mat.data, verts2Mat.rows * sizeof(float) * 3);
+
+	// std::cout << (matR * matR.t());
+	memcpy(R, matR.data, 9 * sizeof(float));
+	memcpy(t, matT.data, 3 * sizeof(float));
+
+	return error;
 }

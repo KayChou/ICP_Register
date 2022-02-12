@@ -5,6 +5,13 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+FIND_PACKAGE(OpenCV REQUIRED)
+
+message(STATUS "version: ${OpenCV_VERSION}")
+message(STATUS "OpenCV_INCLUDE_DIRS = ${OpenCV_INCLUDE_DIRS}")
+message(STATUS "OpenCV_LIBS = ${OpenCV_LIBS}")
+message(STATUS "PROJECT_SOURCE_DIR=${PROJECT_SOURCE_DIR}")
+
 INCLUDE_DIRECTORIES("include")
 INCLUDE_DIRECTORIES("include/ICP")
 INCLUDE_DIRECTORIES("include/utils")
@@ -33,4 +40,5 @@ add_executable(main ${SOURCES}
 
 target_link_libraries(main 
                     glfw3
+                    ${OpenCV_LIBS}
                     )

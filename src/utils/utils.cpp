@@ -8,9 +8,6 @@ void load_ply(char *filename, float* points, int &cnt)
         printf("Failed to load ply: %s\n", filename);
         return;
     }
-    else {
-        printf("Load ply: %s\n", filename);
-    }
     char str[100];
     float tmp;
 
@@ -23,35 +20,20 @@ void load_ply(char *filename, float* points, int &cnt)
     fscanf(f, "%s %s %s", str, str, str);
     fscanf(f, "%s", str);
 
+    printf("Load ply: %s, num: %d\n", filename, cnt);
+
     // read data in binary
     float x, y, z;
 
     for(int i = 0; i < cnt; i++) {
         fscanf(f, "%f %f %f", &points[3 * i], &points[3 * i + 1], &points[3 * i + 2]);
-        points[3 * i] /= 1000;
-        points[3 * i + 1] /= 1000;
-        points[3 * i + 2] /= 1000;
+        // points[3 * i] /= 1000;
+        // points[3 * i + 1] /= 1000;
+        // points[3 * i + 2] /= 1000;
         // printf("%f %f %f\n", x, y, z);
     }
 
     fclose(f);
-}
-
-
-/*
-Apply an afine transofrm to a point cloud
-*/
-void applyAffineTransform(std::vector<Point*>& points, float* R, float* T)
-{
-    Point pRot;
-    for (int i = 0; i < points.size(); i++)
-    {
-        pRot.pos[0] = R[0] * points[i]->pos[0] + R[1] * points[i]->pos[1] + R[2] * points[i]->pos[2] + T[0];
-        pRot.pos[1] = R[3] * points[i]->pos[0] + R[4] * points[i]->pos[1] + R[5] * points[i]->pos[2] + T[1];
-        pRot.pos[2] = R[6] * points[i]->pos[0] + R[7] * points[i]->pos[1] + R[8] * points[i]->pos[2] + T[2];
-
-        *points[i] = pRot;
-    }
 }
 
 
@@ -129,5 +111,60 @@ void load_extrinsic_params(char *filename, KRT *Krt) {
                                     &tmp,
                                     &tmp);
     }
+    fclose(f);
+}
+
+
+void rewrite_params(char *filename, KRT *Krt) {
+    FILE *f = fopen(filename, "w");
+    if(f == NULL) {
+        printf("Failed to read params: %s", filename);
+        return;
+    }
+    else {
+        printf("Write param: %s\n", filename);
+    }
+    char str[100];
+    float tmp;
+
+    for(int i = 0; i < 3; i++) {
+        fprintf(f, "Extrinsic between camera %d and 1\n", i);
+        fprintf(f, "Xc = RXw + T\n");
+        fprintf(f, "\t%12.6f \t%12.6f \t%12.6f\n", Krt[i].R[0], Krt[i].R[1], Krt[i].R[2]);
+        fprintf(f, "\t%12.6f \t%12.6f \t%12.6f\n", Krt[i].R[3], Krt[i].R[4], Krt[i].R[5]);
+        fprintf(f, "\t%12.6f \t%12.6f \t%12.6f\n", Krt[i].R[6], Krt[i].R[7], Krt[i].R[8]);
+        fprintf(f, "\t%12.6f \t%12.6f \t%12.6f\n", Krt[i].T[0], Krt[i].T[1], Krt[i].T[2]);
+
+        fprintf(f, "\n");
+    }
+
+    fclose(f);
+}
+
+
+void export_refined_params(char *filename, float **R, float **T)
+{
+    FILE *f = fopen(filename, "w");
+    if(f == NULL) {
+        printf("Failed to read params: %s", filename);
+        return;
+    }
+    else {
+        printf("Write param: %s\n", filename);
+    }
+    char str[100];
+    float tmp;
+
+    for(int i = 0; i < 3; i++) {
+        fprintf(f, "Extrinsic between camera %d and 1\n", i);
+        fprintf(f, "Xc = RXw + T\n");
+        fprintf(f, "\t%12.6f \t%12.6f \t%12.6f\n", R[i][0], R[i][1], R[i][2]);
+        fprintf(f, "\t%12.6f \t%12.6f \t%12.6f\n", R[i][3], R[i][4], R[i][5]);
+        fprintf(f, "\t%12.6f \t%12.6f \t%12.6f\n", R[i][6], R[i][7], R[i][8]);
+        fprintf(f, "\t%12.6f \t%12.6f \t%12.6f\n", T[i][0], T[i][1], T[i][2]);
+
+        fprintf(f, "\n");
+    }
+
     fclose(f);
 }

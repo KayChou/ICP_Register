@@ -2,8 +2,6 @@
 #include "utils.h"
 #include "Opengl_Render.h"
 
-using namespace gs;
-
 
 int main()
 {
