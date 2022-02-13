@@ -1,4 +1,6 @@
 build/
+params_icp.txt
+params_refined.txt
 
 # Prerequisites
 *.d
