@@ -170,9 +170,9 @@ void Opengl_Render::update_KRT() {
         printf("R of cam %d: %f %f %f | %f %f %f | %f %f %f\n", cam_idx, 
                 R[0], R[1], R[2], R[3], R[4], R[5], R[6], R[7], R[8]);
         printf("T of cam %d: %f %f %f\n", cam_idx, T[0], T[1], T[2]);
-        krt[cam_idx].T[0] = krt[cam_idx].T[0] - krt[cam_idx].R[0] * T[0] + krt[cam_idx].R[1] * T[1] + krt[cam_idx].R[2] * T[2];
-        krt[cam_idx].T[1] = krt[cam_idx].T[1] - krt[cam_idx].R[3] * T[0] + krt[cam_idx].R[4] * T[1] + krt[cam_idx].R[5] * T[2];
-        krt[cam_idx].T[2] = krt[cam_idx].T[2] - krt[cam_idx].R[6] * T[0] + krt[cam_idx].R[7] * T[1] + krt[cam_idx].R[8] * T[2];
+        krt[cam_idx].T[0] = krt[cam_idx].T[0] - (krt[cam_idx].R[0] * T[0] + krt[cam_idx].R[1] * T[1] + krt[cam_idx].R[2] * T[2]);
+        krt[cam_idx].T[1] = krt[cam_idx].T[1] - (krt[cam_idx].R[3] * T[0] + krt[cam_idx].R[4] * T[1] + krt[cam_idx].R[5] * T[2]);
+        krt[cam_idx].T[2] = krt[cam_idx].T[2] - (krt[cam_idx].R[6] * T[0] + krt[cam_idx].R[7] * T[1] + krt[cam_idx].R[8] * T[2]);
     }
     rewrite_params((char*)"../params_refined.txt", krt);
     export_refined_params((char*)"../params_icp.txt", this->R_icp, this->T_icp);
